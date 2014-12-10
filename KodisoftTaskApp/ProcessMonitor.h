@@ -1,8 +1,13 @@
 #include <windows.h>
 #include <tchar.h>
 #include <Psapi.h>
+#include <string>
+#include <fstream>
+#include <ctime>
 
 #pragma once
+
+class Logger;
 
 class ProcessMonitor
 {
@@ -13,7 +18,9 @@ private:
 	DWORD status;
 	BOOL isLoopNeeded;
 
-	enum {RUNNING = 0, STOPPED = 1, RESTARTING = 2};
+	Logger *log;
+
+	enum { RUNNING = 0, STOPPED = 1, RESTARTING = 2 };
 
 public:
 	ProcessMonitor();
@@ -24,9 +31,23 @@ public:
 	HANDLE getProcessHandle();
 	DWORD getProcessId();
 	DWORD getStatus();
+	LPSTR getPath();
 
 	BOOL start();
 	BOOL stop();
 	BOOL restart();
 };
 
+class Logger
+{
+private:
+	std::string path;
+	std::ofstream log;
+
+public:
+	Logger();
+	Logger(std::string path);
+	~Logger();
+
+	void writeMessage(ProcessMonitor &pm, std::string action);
+};

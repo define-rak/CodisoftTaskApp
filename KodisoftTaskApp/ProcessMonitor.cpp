@@ -1,7 +1,5 @@
 #include "ProcessMonitor.h"
-#include <iostream>
-
-using namespace std;
+#include <cstdio>
 
 ProcessMonitor::ProcessMonitor()
 {
@@ -32,10 +30,25 @@ ProcessMonitor::ProcessMonitor(LPTSTR path)
 
 ProcessMonitor::ProcessMonitor(DWORD pId)
 {
-	DWORD pid = 6816;
-	HANDLE h = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
-	LPSTR s = new TCHAR[256];
-	GetModuleFileNameEx(h, NULL, s, 256);
+	ZeroMemory(&(this->si), sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&(this->pi), sizeof(pi));
+
+	(this->pi).dwProcessId = pId;
+	(this->pi).hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (this->pi).dwProcessId);
+
+	if ((this->pi).hProcess != 0)
+	{
+		this->path = new TCHAR[256];
+		GetModuleFileNameEx((this->pi).hProcess, NULL, this->path, 256);
+		printf("%s", this->path);
+		this->status = RUNNING;
+		this->isLoopNeeded = TRUE;		
+	}
+	else
+	{
+		this->status = STOPPED;
+	}
 }
 
 //
@@ -55,6 +68,11 @@ DWORD ProcessMonitor::getStatus()
 	return this->status;
 }
 
+LPSTR ProcessMonitor::getPath()
+{
+	return this->path;
+}
+
 //
 
 BOOL ProcessMonitor::start()
@@ -69,10 +87,12 @@ BOOL ProcessMonitor::start()
 		}
 
 		this->status = RUNNING;
+		(this->log)->writeMessage(*this, "Start");
 	}
 
-	while (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_OBJECT_0)
+	while (WaitForSingleObject((this->pi).hProcess, INFINITE) == WAIT_OBJECT_0)
 	{
+		(this->log)->writeMessage(*this, "Crash");
 		if (this->isLoopNeeded == FALSE)
 		{
 			return FALSE;
@@ -89,6 +109,7 @@ BOOL ProcessMonitor::start()
 		else
 		{
 			this->status = RUNNING;
+			(this->log)->writeMessage(*this, "Start");
 		} 
 	}
 }
@@ -102,6 +123,7 @@ BOOL ProcessMonitor::stop()
 			this->status = STOPPED;
 			CloseHandle(this->pi.hProcess);
 			CloseHandle(this->pi.hThread);
+			(this->log)->writeMessage(*this, "Manual shutdown");
 			return FALSE;
 		}
 
@@ -109,3 +131,32 @@ BOOL ProcessMonitor::stop()
 	}
 	return FALSE;
 }
+
+//
+//
+//
+
+Logger::Logger()
+{
+	
+}
+
+Logger::Logger(std::string path)
+{
+	this->path = path;
+	(this->log).open((this->path).c_str());
+}
+
+Logger::~Logger()
+{
+	(this->path).erase();
+	(this->log).close();
+}
+
+//
+
+void Logger::writeMessage(ProcessMonitor &pm, std::string action)
+{
+	(this->log) << action.c_str() << "," << std::time(0) << "," << pm.getPath() << "," << pm.getProcessHandle() << "," << pm.getProcessId() << std::endl;
+}
+
