@@ -11,7 +11,9 @@ ProcessMonitor::ProcessMonitor()
 	si.cb = sizeof(si);
 	ZeroMemory(&(this->pi), sizeof(pi));
 
-	this->status = 1;
+	this->status = STOPPED;
+	
+	this->isLoopNeeded = TRUE;
 }
 
 ProcessMonitor::ProcessMonitor(LPTSTR path)
@@ -23,68 +25,87 @@ ProcessMonitor::ProcessMonitor(LPTSTR path)
 	si.cb = sizeof(si);
 	ZeroMemory(&(this->pi), sizeof(pi));
 
-	this->status = 1;
+	this->status = STOPPED;
+
+	this->isLoopNeeded = TRUE;
 }
 
-//void ProcessMonitor::runProcess()
-//{
-//	STARTUPINFO si;
-//	PROCESS_INFORMATION pi;
-//
-//	ZeroMemory(&si, sizeof(si));
-//	ZeroMemory(&pi, sizeof(si));
-//	si.cb = sizeof(si);
-//
-//	if (this->status == STOPPED)
-//	{
-//		CreateProcess(NULL, this->path, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL,
-//			&si, &pi);
-//		this->status = WORKING;
-//	}
-//
-//	this->si = si;
-//	this->pi = pi;
-//}
-//
-//void ProcessMonitor::stopProcess()
-//{
-//	HANDLE hProcess = pi.hProcess;
-//	HANDLE hThread = pi.hThread;
-//
-//	if (this->status == WORKING)
-//	{
-//		CloseHandle(hProcess);
-//		CloseHandle(hThread);
-//	}
-//}
-//
-//ProcessMonitor::~ProcessMonitor()
-//{
-//}
-
-BOOL WINAPI ProcessMonitor::start()
+ProcessMonitor::ProcessMonitor(DWORD pId)
 {
-	if (!CreateProcess(NULL, this->path, NULL, NULL,
-		FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &(this->si), &(this->pi)))
-	{
-		//fputs(format("process::start(...) failed [%d]\n", GetLastError()), stderr);
-		return false;
-	}
-
-	//WaitForSingleObject(pi.hProcess, INFINITE);
-	//CloseHandle(pi.hProcess);
-	//CloseHandle(pi.hThread);
-	return true;
+	DWORD pid = 6816;
+	HANDLE h = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+	LPSTR s = new TCHAR[256];
+	GetModuleFileNameEx(h, NULL, s, 256);
 }
 
-BOOL __stdcall ProcessMonitor::stop()
+//
+
+HANDLE ProcessMonitor::getProcessHandle()
 {
-	if (!TerminateProcess((this->pi).hProcess, EXIT_SUCCESS))
+	return (this->pi).hProcess;
+}
+
+DWORD ProcessMonitor::getProcessId()
+{
+	return (this->pi).dwProcessId;
+}
+
+DWORD ProcessMonitor::getStatus()
+{
+	return this->status;
+}
+
+//
+
+BOOL ProcessMonitor::start()
+{
+	if (this->status == STOPPED)
 	{
-		CloseHandle(this->pi.hProcess);
-		CloseHandle(this->pi.hThread);
-		return false;
+		if (!CreateProcess(NULL, this->path, NULL, NULL,
+			FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &(this->si), &(this->pi)))
+		{
+			this->status = STOPPED;
+			return FALSE;
+		}
+
+		this->status = RUNNING;
 	}
 
-	return true;
+	while (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_OBJECT_0)
+	{
+		if (this->isLoopNeeded == FALSE)
+		{
+			return FALSE;
+		}
+
+		this->status = RESTARTING;
+
+		if (!CreateProcess(NULL, this->path, NULL, NULL,
+			FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &(this->si), &(this->pi)))
+		{
+			this->status = STOPPED;
+			return TRUE;
+		}
+		else
+		{
+			this->status = RUNNING;
+		} 
+	}
+}
+
+BOOL ProcessMonitor::stop()
+{
+	if (this->status == RUNNING)
+	{
+		if (!TerminateProcess((this->pi).hProcess, EXIT_SUCCESS))
+		{
+			this->status = STOPPED;
+			CloseHandle(this->pi.hProcess);
+			CloseHandle(this->pi.hThread);
+			return FALSE;
+		}
+
+		return TRUE;
+	}
+	return FALSE;
 }
