@@ -18,6 +18,7 @@ public:
 	//~ProcessMonitor();
 
 	BOOL WINAPI start();
-	BOOL WINAPI stop();
+	BOOL __stdcall stop();
+	
 };
 

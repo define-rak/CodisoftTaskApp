@@ -10,7 +10,7 @@ int main()
 
 	ProcessMonitor my("c:\\windows\\notepad.exe");
 	my.start();
-
+	cout << my.stop();
 
 	system("pause");
 

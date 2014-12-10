@@ -6,6 +6,11 @@ using namespace std;
 ProcessMonitor::ProcessMonitor()
 {
 	this->path = NULL;
+
+	ZeroMemory(&(this->si), sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&(this->pi), sizeof(pi));
+
 	this->status = 1;
 }
 
@@ -13,6 +18,11 @@ ProcessMonitor::ProcessMonitor(LPTSTR path)
 {
 	this->path = new TCHAR[sizeof(path) / sizeof(TCHAR)];
 	lstrcpy((this->path), path);
+
+	ZeroMemory(&(this->si), sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&(this->pi), sizeof(pi));
+
 	this->status = 1;
 }
 
@@ -54,9 +64,6 @@ ProcessMonitor::ProcessMonitor(LPTSTR path)
 
 BOOL WINAPI ProcessMonitor::start()
 {
-	ZeroMemory(&(this->si), sizeof(si));
-	si.cb = sizeof(si);
-	ZeroMemory(&(this->pi), sizeof(pi));
 	if (!CreateProcess(NULL, this->path, NULL, NULL,
 		FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &(this->si), &(this->pi)))
 	{
@@ -67,5 +74,17 @@ BOOL WINAPI ProcessMonitor::start()
 	//WaitForSingleObject(pi.hProcess, INFINITE);
 	//CloseHandle(pi.hProcess);
 	//CloseHandle(pi.hThread);
+	return true;
+}
+
+BOOL __stdcall ProcessMonitor::stop()
+{
+	if (!TerminateProcess((this->pi).hProcess, EXIT_SUCCESS))
+	{
+		CloseHandle(this->pi.hProcess);
+		CloseHandle(this->pi.hThread);
+		return false;
+	}
+
 	return true;
 }
